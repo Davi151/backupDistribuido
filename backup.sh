@@ -12,7 +12,7 @@ case "$OPTVAR" in
         then
            diretorioMonitorado=$OPTARG
         else
-           echo "Está errado, babaca..."
+           echo "Parâmetro Inválido..."
            exit 1
         fi
 
@@ -21,7 +21,7 @@ case "$OPTVAR" in
         then
                 tempo=$OPTARG
         else
-                echo "Está errado, babaca..."
+                echo "Parâmetro Inválido..."
                 exit 1
         fi
         ;;
@@ -34,7 +34,7 @@ case "$OPTVAR" in
         then
             arquivoConfig=$OPTARG
         else
-                echo "Está errado, babaca ..."
+                echo "Parâmetro Inválido..."
                 exit 1
         fi
 
@@ -43,7 +43,7 @@ case "$OPTVAR" in
         then
                 tempo=$OPTARG
         else
-                echo "Está errado, babaca..."
+                echo "Parâmetro Inválido..."
                 exit 1
         fi
 
@@ -54,7 +54,7 @@ case "$OPTVAR" in
         then
                 tempo=$OPTARG
         else
-                echo "Está errado, babaca..."
+                echo "Parâmetro Inválido..."
                 exit 1
         fi
         ;;
@@ -76,55 +76,85 @@ do
    qtdAtu=`cat /tmp/new.txt | wc -l`
 
 
-
    if [ $qtdAtu -gt $qtdAnt ]
    then
-      Hora=`date +[%d-%m-%Y" "%H:%M:%S]`
-      echo $Hora "Adicionados: " `comm -1 -3 /tmp/old.txt /tmp/new.txt` >> dirSensors.log
+
       comm -1 -3 /tmp/old.txt /tmp/new.txt >> N.log
 
       arquivo=`awk '{print $2}' N.log`
       rm N.log
 
+      for i in `sed 's/ /:/g' $arquivoConfig`
+      do
+         ip=`echo $i | cut -f1 -d":"`
+         user=`echo $i | cut -f2 -d":"`
+         chave=`echo $i | cut -f3 -d":"`
+         diretorioDestino=`echo $i | cut -f4 -d":"`
 
-      ip=`cat $arquivoConfig | cut -f1 -d" "`
-      user=`cat $arquivoConfig | cut -f2 -d" "`
-      chave=`cat $arquivoConfig | cut -f3 -d" "`
-      diretorioDestino=`cat $arquivoConfig | cut -f4 -d" "`
 
-      scp -r -i $chave $arquivo $user@$ip:$diretorioDestino
+         echo "Enviando para $user"
+         scp -r -i $chave $arquivo $user@$ip:$diretorioDestino
+         echo
 
-      cp $arquivo $diretorioDestino
-
+         Hora=`date +[%d-%m-%Y" "%H:%M:%S]`
+         echo $Hora "Adicionados: " `comm -1 -3 /tmp/old.txt /tmp/new.txt` >> dirSensors.log
+      done
    fi
 
 
    if [ $qtdAtu -lt $qtdAnt ] || [ $qtdAtu -eq $qtdAnt ]
    then
-      Hora=`date +[%d-%m-%Y" "%H:%M:%S]`
-      echo $Hora "Removidos: "`comm -2 -3 /tmp/old.txt /tmp/new.txt` >> dirSensors.log
+
       comm -2 -3 /tmp/old.txt /tmp/new.txt >> N.log
 
-#     arquivo=`awk -F"/" '{print $2}' N.log`
-      for i in `cat N.log | cut -d'/' -f2`
-      do
-         rm "$diretorioDestino/$i" 2> /dev/null
-      done
+      arquivo=`awk -F"/" '{print $2}' N.log`
       rm N.log
+
+      if [ -n "$arquivo" ]
+      then
+
+      for i in `sed 's/ /:/g' $arquivoConfig`
+      do
+         ip=`echo $i | cut -f1 -d":"`
+         user=`echo $i | cut -f2 -d":"`
+         chave=`echo $i | cut -f3 -d":"`
+         diretorioDestino=`echo $i | cut -f4 -d":"`
+
+
+         ssh -i $chave $user@$ip "cd $diretorioDestino ; rm "$arquivo""
+
+         Hora=`date +[%d-%m-%Y" "%H:%M:%S]`
+         echo $Hora "Removidos: " `comm -1 -3 /tmp/old.txt /tmp/new.txt` >> dirSensors.log
+      done
+      fi
    fi
 
 
    if [ $qtdAtu -eq $qtdAnt ]
    then
 
-      Hora=`date +[%d-%m-%Y" "%H:%M:%S]`
-      echo $Hora "Modificados: " `comm -1 -3 /tmp/old.txt /tmp/new.txt` >> dirSensors.log
       comm -1 -3 /tmp/old.txt /tmp/new.txt >> N.log
 
       arquivo=`awk '{print $2}' N.log`
       rm N.log
-      cp $arquivo $diretorioDestino 2>/dev/null
 
+      if [ -n "$arquivo" ]
+         then
+
+         for i in `sed 's/ /:/g' $arquivoConfig`
+         do
+            ip=`echo $i | cut -f1 -d":"`
+            user=`echo $i | cut -f2 -d":"`
+            chave=`echo $i | cut -f3 -d":"`
+            diretorioDestino=`echo $i | cut -f4 -d":"`
+
+            echo "Arquivos Modificados em $user"
+            scp -r -i $chave $arquivo $user@$ip:$diretorioDestino
+            echo
+
+            Hora=`date +[%d-%m-%Y" "%H:%M:%S]`
+            echo $Hora "Modificados: " `comm -1 -3 /tmp/old.txt /tmp/new.txt` >> dirSensors.log
+         done
+      fi
    fi
-
 done
